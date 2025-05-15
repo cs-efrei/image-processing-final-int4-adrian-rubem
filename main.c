@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bmp8.h"
+#include <string.h>
 
 void printMenu() {
     printf("\nPlease choose an option:\n");
