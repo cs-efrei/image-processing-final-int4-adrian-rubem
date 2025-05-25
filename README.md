@@ -79,6 +79,6 @@ make
 
 ## 📋 Task Distribution
 
-- **Adrian**: File reading/writing, grayscale filters
+- **Adrian**: File reading/writing, grayscale filters, read me
 - **Saïf**: Color filters, user interface, histogram equalization
 
