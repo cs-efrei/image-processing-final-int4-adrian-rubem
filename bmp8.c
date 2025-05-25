@@ -1,189 +1,306 @@
+#include "bmp8.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include "bmp8.h"
+#include <math.h>
 
-t_bmp8* bmp8_loadImage(const char* filename) {
-    FILE* file = fopen(filename, "rb");
-    if (!file) {
-        fprintf(stderr, "Error: Could not open file %s\n", filename);
+
+unsigned int *bmp8_computeHistogram(t_bmp8 *img) {
+    unsigned int *hist = calloc(256, sizeof(unsigned int));
+    if (!hist) {
+        printf("Memory allocation failed for histogram.\n");
         return NULL;
     }
 
-    t_bmp8* img = (t_bmp8*)malloc(sizeof(t_bmp8));
+    for (unsigned int i = 0; i < img->dataSize; i++) {
+        hist[img->data[i]]++;
+    }
+
+    return hist;
+}
+
+unsigned int *bmp8_computeCDF(unsigned int *hist) {
+    unsigned int *cdf = malloc(256 * sizeof(unsigned int));
+    if (!cdf) {
+        printf("Memory allocation failed for CDF.\n");
+        return NULL;
+    }
+
+    cdf[0] = hist[0];
+    for (int i = 1; i < 256; i++) {
+        cdf[i] = cdf[i - 1] + hist[i];
+    }
+
+    return cdf;
+}
+
+
+void bmp8_equalize(t_bmp8 *img, unsigned int *cdf) {
+    unsigned char map[256];
+    unsigned int totalPixels = img->width * img->height;
+
+    // Find the first cdf not equal to zero
+    unsigned int cdf_min = 0;
+    for (int i = 0; i < 256; i++) {
+        if (cdf[i] != 0) {
+            cdf_min = cdf[i];
+            break;
+        }
+    }
+
+    // DEBUG : a look of CDF
+    printf("\n--- CDF Preview ---\n");
+    for (int i = 0; i < 256; i += 32) {
+        printf("cdf[%3d] = %u\n", i, cdf[i]);
+    }
+
+    // Create the correspondance of the table ( LUT)
+    for (int i = 0; i < 256; i++) {
+        map[i] = (unsigned char) roundf(((float)(cdf[i] - cdf_min) / (totalPixels - cdf_min)) * 255.0f);
+    }
+
+    // DEBUG : A look of the mappage table
+    printf("\n--- LUT Mapping ---\n");
+    for (int i = 0; i < 256; i += 32) {
+        printf("map[%3d] = %d\n", i, map[i]);
+    }
+
+    // DEBUG : Examples before and after of pixels values
+    printf("\n--- Sample pixel values (first 10) ---\n");
+    for (int i = 0; i < 10; i++) {
+        unsigned char old = img->data[i];
+        unsigned char new = map[old];
+        printf("Pixel[%d]: %d -> %d\n", i, old, new);
+    }
+
+    // Input the LUT to all the pixels
+    for (unsigned int i = 0; i < img->dataSize; i++) {
+        img->data[i] = map[img->data[i]];
+    }
+}
+
+
+// Load 8-bit BMP image from file
+t_bmp8 *bmp8_loadImage(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (!f) {
+        printf("Unable to open file %s\n", filename);
+        return NULL;
+    }
+
+    t_bmp8 *img = malloc(sizeof(t_bmp8));
     if (!img) {
-        fclose(file);
-        fprintf(stderr, "Error: Memory allocation failed\n");
+        fclose(f);
+        printf("Memory allocation failed\n");
         return NULL;
     }
 
-    if (fread(img->header, 1, 54, file) != 54) {
-        fclose(file);
+    // Reading header BMP (54 octets)
+    if (fread(img->header, sizeof(unsigned char), 54, f) != 54) {
+        printf("Failed to read BMP header.\n");
         free(img);
-        fprintf(stderr, "Error: Not a valid BMP file\n");
+        fclose(f);
         return NULL;
     }
 
-    if (img->header[0] != 'B' || img->header[1] != 'M') {
-        fclose(file);
-        free(img);
-        fprintf(stderr, "Error: Not a valid BMP file\n");
-        return NULL;
-    }
-
-    img->width = *(unsigned int*)&img->header[18];
-    img->height = *(unsigned int*)&img->header[22];
-    img->colorDepth = *(unsigned short*)&img->header[28];
-    img->dataSize = *(unsigned int*)&img->header[34];
+    // Extract data
+    img->width       = *(unsigned int *)&img->header[18];
+    img->height      = *(unsigned int *)&img->header[22];
+    img->colorDepth  = *(unsigned short *)&img->header[28];
+    img->dataSize    = *(unsigned int *)&img->header[34];
 
     if (img->colorDepth != 8) {
-        fclose(file);
+        printf("Only 8-bit grayscale BMP files are supported.\n");
         free(img);
-        fprintf(stderr, "Error: Not an 8-bit grayscale image\n");
+        fclose(f);
         return NULL;
     }
 
-    if (fread(img->colorTable, 1, 1024, file) != 1024) {
-        fclose(file);
+    // Read (1024 octets)
+    if (fread(img->colorTable, sizeof(unsigned char), 1024, f) != 1024) {
+        printf("Failed to read color palette.\n");
         free(img);
-        fprintf(stderr, "Error: Could not read color table\n");
+        fclose(f);
         return NULL;
     }
 
-    img->data = (unsigned char*)malloc(img->dataSize);
+    // If dataSize is incorrect or null, we re-calcule
+    if (img->dataSize == 0) {
+        int rowSize = ((img->width + 3) / 4) * 4; // on 4 octets
+        img->dataSize = rowSize * img->height;
+    }
+
+    // Allocation of pixel data
+    img->data = malloc(img->dataSize);
     if (!img->data) {
-        fclose(file);
+        printf("Failed to allocate memory for image data.\n");
         free(img);
-        fprintf(stderr, "Error: Memory allocation for image data failed\n");
+        fclose(f);
         return NULL;
     }
 
-    if (fread(img->data, 1, img->dataSize, file) != img->dataSize) {
-        fclose(file);
+    // Read pixels data
+    if (fread(img->data, sizeof(unsigned char), img->dataSize, f) != img->dataSize) {
+        printf("Failed to read pixel data.\n");
         free(img->data);
         free(img);
-        fprintf(stderr, "Error: Could not read image data\n");
+        fclose(f);
         return NULL;
     }
 
-    fclose(file);
+    fclose(f);
     return img;
 }
 
-void bmp8_saveImage(const char* filename, t_bmp8* img) {
-    if (!img || !img->data) {
-        fprintf(stderr, "Error: Invalid image data\n");
+
+// Save image
+void bmp8_saveImage(const char *filename, t_bmp8 *img) {
+    FILE *f = fopen(filename, "wb");
+    if (!f) {
+        printf("Unable to save to %s\n", filename);
         return;
     }
 
-    FILE* file = fopen(filename, "wb");
-    if (!file) {
-        fprintf(stderr, "Error: Could not create file %s\n", filename);
-        return;
-    }
+    // 1. Write the BMP header (54 bytes)
+    fwrite(img->header, sizeof(unsigned char), 54, f);
 
-    if (fwrite(img->header, 1, 54, file) != 54) {
-        fclose(file);
-        fprintf(stderr, "Error: Could not write header\n");
-        return;
-    }
+    // 2. Write the color table (1024 bytes for 256 grayscale values)
+    fwrite(img->colorTable, sizeof(unsigned char), 1024, f);
 
-    if (fwrite(img->colorTable, 1, 1024, file) != 1024) {
-        fclose(file);
-        fprintf(stderr, "Error: Could not write color table\n");
-        return;
-    }
+    // 3. Write the image data (size = dataSize)
+    fwrite(img->data, sizeof(unsigned char), img->dataSize, f);
 
-    if (fwrite(img->data, 1, img->dataSize, file) != img->dataSize) {
-        fclose(file);
-        fprintf(stderr, "Error: Could not write image data\n");
-        return;
-    }
-
-    fclose(file);
+    printf("Image save successfully in %s\n", filename);
+    fclose(f);
 }
 
-void bmp8_free(t_bmp8* img) {
+
+
+// Free all memory used by the image
+void bmp8_free(t_bmp8 *img) {
     if (img) {
-        if (img->data) {
-            free(img->data);
-        }
+        free(img->data);
         free(img);
     }
 }
 
-void bmp8_printInfo(t_bmp8* img) {
-    if (!img) {
-        printf("Error: Invalid image\n");
-        return;
-    }
-
-    printf("Image Info:\n");
-    printf("    Width: %u\n", img->width);
-    printf("    Height: %u\n", img->height);
-    printf("    Color Depth: %u\n", img->colorDepth);
-    printf("    Data Size: %u\n", img->dataSize);
+// Information, dimension...
+void bmp8_printInfo(const t_bmp8 *img) {
+    printf("\nImage information:\n");
+    printf("Width        : %u pixels\n", img->width);
+    printf("Height       : %u pixels\n", img->height);
+    printf("Color Depth  : %u bits\n", img->colorDepth);
+    printf("Image Size   : %u bytes\n", img->dataSize);
 }
 
-void bmp8_negative(t_bmp8* img) {
-    if (!img || !img->data) return;
-
+// Negative filter
+void bmp8_negative(t_bmp8 *img) {
     for (unsigned int i = 0; i < img->dataSize; i++) {
+        // Inverts pixel intensity
         img->data[i] = 255 - img->data[i];
     }
 }
 
-void bmp8_brightness(t_bmp8* img, int value) {
-    if (!img || !img->data) return;
-
+// Brightness filter
+void bmp8_brightness(t_bmp8 *img, int value) {
     for (unsigned int i = 0; i < img->dataSize; i++) {
-        int new_value = img->data[i] + value;
-        if (new_value > 255) new_value = 255;
-        if (new_value < 0) new_value = 0;
-        img->data[i] = (unsigned char)new_value;
+        int temp = img->data[i] + value;
+        img->data[i] = (temp > 255) ? 255 : (temp < 0 ? 0 : (unsigned char)temp);
     }
 }
 
-void bmp8_threshold(t_bmp8* img, int threshold) {
-    if (!img || !img->data) return;
-    if (threshold < 0) threshold = 0;
-    if (threshold > 255) threshold = 255;
-
+// Threshold filter
+void bmp8_threshold(t_bmp8 *img, int threshold) {
     for (unsigned int i = 0; i < img->dataSize; i++) {
         img->data[i] = (img->data[i] >= threshold) ? 255 : 0;
     }
 }
 
-void bmp8_applyFilter(t_bmp8* img, float** kernel, int kernelSize) {
-    if (!img || !img->data || !kernel || kernelSize % 2 == 0) return;
-
-    unsigned char* tempData = (unsigned char*)malloc(img->dataSize);
-    if (!tempData) return;
-    memcpy(tempData, img->data, img->dataSize);
-
+// Convolution filter (deepseek help sometimes)
+// This is used by all advanced filters
+void bmp8_applyFilter(t_bmp8 *img, float **kernel, int kernelSize) {
     int n = kernelSize / 2;
-    int width = img->width;
-    int height = img->height;
+    unsigned char *newData = malloc(img->dataSize);
+    if (!newData) {
+        printf("Memory error during filter.\n");
+        return;
+    }
 
-    for (int y = n; y < height - n; y++) {
-        for (int x = n; x < width - n; x++) {
-            float sum = 0.0f;
-
+    for (unsigned int y = 0; y < img->height; y++) {
+        for (unsigned int x = 0; x < img->width; x++) {
+            float pixel = 0.0f;
             for (int ky = -n; ky <= n; ky++) {
                 for (int kx = -n; kx <= n; kx++) {
-                    int pixelX = x + kx;
-                    int pixelY = y + ky;
-                    unsigned char pixelValue = img->data[pixelY * width + pixelX];
-                    sum += pixelValue * kernel[ky + n][kx + n];
+                    int ix = x + kx;
+                    int iy = y + ky;
+                    if (ix >= 0 && ix < (int)img->width && iy >= 0 && iy < (int)img->height) {
+                        pixel += img->data[iy * img->width + ix] * kernel[ky + n][kx + n];
+                    }
                 }
             }
-
-            if (sum > 255) sum = 255;
-            if (sum < 0) sum = 0;
-            tempData[y * width + x] = (unsigned char)sum;
+            if (pixel < 0) pixel = 0;
+            if (pixel > 255) pixel = 255;
+            newData[y * img->width + x] = (unsigned char)roundf(pixel);
         }
     }
 
-    memcpy(img->data, tempData, img->dataSize);
-    free(tempData);
+    // Replace the previous image
+    for (unsigned int i = 0; i < img->dataSize; i++) {
+        img->data[i] = newData[i];
+    }
+    free(newData);
+}
+
+// Predefined filters
+void bmp8_boxBlur(t_bmp8 *img) {
+    float box[3][3] = {
+        {1/9.f, 1/9.f, 1/9.f},
+        {1/9.f, 1/9.f, 1/9.f},
+        {1/9.f, 1/9.f, 1/9.f}
+    };
+    float* kernel[3] = { box[0], box[1], box[2] };
+    bmp8_applyFilter(img, kernel, 3);
+}
+
+// Gaussian blur
+void bmp8_gaussianBlur(t_bmp8 *img) {
+    float gauss[3][3] = {
+        {1/16.f, 2/16.f, 1/16.f},
+        {2/16.f, 4/16.f, 2/16.f},
+        {1/16.f, 2/16.f, 1/16.f}
+    };
+    float* kernel[3] = { gauss[0], gauss[1], gauss[2] };
+    bmp8_applyFilter(img, kernel, 3);
+}
+
+// Outline
+void bmp8_outline(t_bmp8 *img) {
+    float outline[3][3] = {
+        {-1, -1, -1},
+        {-1,  8, -1},
+        {-1, -1, -1}
+    };
+    float* kernel[3] = { outline[0], outline[1], outline[2] };
+    bmp8_applyFilter(img, kernel, 3);
+}
+
+// Emboss
+void bmp8_emboss(t_bmp8 *img) {
+    float emboss[3][3] = {
+        {-2, -1, 0},
+        {-1,  1, 1},
+        { 0,  1, 2}
+    };
+    float* kernel[3] = { emboss[0], emboss[1], emboss[2] };
+    bmp8_applyFilter(img, kernel, 3);
+}
+
+// Sharpen
+void bmp8_sharpen(t_bmp8 *img) {
+    float sharpen[3][3] = {
+        { 0, -1,  0},
+        {-1,  5, -1},
+        { 0, -1,  0}
+    };
+    float* kernel[3] = { sharpen[0], sharpen[1], sharpen[2] };
+    bmp8_applyFilter(img, kernel, 3);
 }
