@@ -72,7 +72,7 @@ t_bmp24 *bmp24_loadImage(const char *filename) {
         return NULL;
     }
 
-    // Allocate the structure
+    // structure is allocated
     t_bmp24 *img = malloc(sizeof(t_bmp24));
     img->width = width;
     img->height = height;
@@ -84,7 +84,6 @@ t_bmp24 *bmp24_loadImage(const char *filename) {
         return NULL;
     }
 
-    // // Read pixel data starting at "offset", line by line (a big issues in the process of the bm24.c
     fseek(f, offset, SEEK_SET);
     int padding = (4 - (width * 3) % 4) % 4;
 
@@ -96,7 +95,7 @@ t_bmp24 *bmp24_loadImage(const char *filename) {
             img->data[height - 1 - y][x].green = bgr[1];
             img->data[height - 1 - y][x].red = bgr[2];
         }
-        // skip padding bytes
+        // padding byte skip
         fseek(f, padding, SEEK_CUR);
     }
 
@@ -105,7 +104,7 @@ t_bmp24 *bmp24_loadImage(const char *filename) {
     return img;
 }
 
-// Save (for 24-bit)
+// Save 24-bytes
 void bmp24_saveImage(t_bmp24 *img, const char *filename) {
     FILE *f = fopen(filename, "wb");
     if (!f) {
@@ -113,20 +112,20 @@ void bmp24_saveImage(t_bmp24 *img, const char *filename) {
         return;
     }
 
-    // // Write BMP header (14 bytes)
+    // // BMP header
     uint16_t type = 0x4D42;
     uint32_t offset = 54;
     uint32_t size = offset + (img->width * 3 + (4 - (img->width * 3 % 4)) % 4) * img->height;
     uint16_t reserved = 0;
 
-    // Write BMP info header (40 bytes)
+    // BMP info header
     fwrite(&type, sizeof(uint16_t), 1, f);
     fwrite(&size, sizeof(uint32_t), 1, f);
     fwrite(&reserved, sizeof(uint16_t), 1, f);
     fwrite(&reserved, sizeof(uint16_t), 1, f);
     fwrite(&offset, sizeof(uint32_t), 1, f);
 
-    // Write header info (40 octets)
+    // Header info
     uint32_t headerSize = 40;
     uint16_t planes = 1;
     uint16_t bits = 24;
@@ -143,12 +142,12 @@ void bmp24_saveImage(t_bmp24 *img, const char *filename) {
     fwrite(&imageSize, sizeof(uint32_t), 1, f);
     fwrite(&resolution, sizeof(int32_t), 1, f);
     fwrite(&resolution, sizeof(int32_t), 1, f);
-    // ncolors = 0
+    // Ncolors = 0
     fwrite(&compression, sizeof(uint32_t), 1, f);
-    // important colors = 0
+    // Important colors = 0
     fwrite(&compression, sizeof(uint32_t), 1, f);
 
-    // Write pixels
+    // Pixel is write
     int padding = (4 - (img->width * 3) % 4) % 4;
     unsigned char pad[3] = {0, 0, 0};
 
@@ -168,8 +167,7 @@ void bmp24_saveImage(t_bmp24 *img, const char *filename) {
     printf("Image save successfully in %s\n", filename);
 }
 
-// Filters: simple operations
-// Invert color
+// Color inverting
 void bmp24_negative(t_bmp24 *img) {
     for (int y = 0; y < img->height; y++) {
         for (int x = 0; x < img->width; x++) {
@@ -181,7 +179,7 @@ void bmp24_negative(t_bmp24 *img) {
     }
 }
 
-// Convert to grayscale (average of RGB channels)
+// Grayscale converting
 void bmp24_grayscale(t_bmp24 *img) {
     for (int y = 0; y < img->height; y++) {
         for (int x = 0; x < img->width; x++) {
@@ -244,7 +242,7 @@ void bmp24_applyFilter(t_bmp24 *img, float **kernel, int kernelSize) {
     img->data = newData;
 }
 
-// Advanced filters
+// Filters advanced
 void bmp24_boxBlur(t_bmp24 *img) {
     float box[3][3] = {
         {1/9.f, 1/9.f, 1/9.f},
@@ -295,7 +293,7 @@ void bmp24_sharpen(t_bmp24 *img) {
     bmp24_applyFilter(img, kernel, 3);
 }
 
-// RED channel
+// Channel red
 unsigned int *bmp24_computeHistogramR(const t_bmp24 *img) {
     unsigned int *hist=calloc(256, sizeof(unsigned int)); // We use calloc(256, sizeof(unsigned int)) to create an array of 256 integers (0-255 colour levels).
     if (!hist) return 0;
@@ -308,7 +306,7 @@ unsigned int *bmp24_computeHistogramR(const t_bmp24 *img) {
     return hist;
 }
 
-// GREEN channel
+// Channel green
 unsigned int *bmp24_computeHistogramG(const t_bmp24 *img) {
     unsigned int *hist=calloc(256, sizeof(unsigned int)); // We use calloc(256, sizeof(unsigned int)) also
     if (!hist) return 0;
@@ -322,7 +320,7 @@ unsigned int *bmp24_computeHistogramG(const t_bmp24 *img) {
 }
 
 
-// BLUE channel
+// Channel blue
 unsigned int *bmp24_computeHistogramB(const t_bmp24 *img) {
     unsigned int *hist=calloc(256, sizeof(unsigned int)); // And here finally
     if (!hist) return 0;
@@ -363,7 +361,7 @@ void bmp24_equalize(t_bmp24 *img) {
     int height = img->height;
     int size = width * height;
 
-    // Buffer allocation Y, U, V
+    // Allocation buffer
     float *Y = malloc(size * sizeof(float));
     float *U = malloc(size * sizeof(float));
     float *V = malloc(size * sizeof(float));
@@ -374,7 +372,7 @@ void bmp24_equalize(t_bmp24 *img) {
         return;
     }
 
-    // sStep 1 : conversion RGB → YUV
+    // 1 : conversion RGB to YUV
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             t_pixel p = img->data[y][x];
@@ -390,7 +388,7 @@ void bmp24_equalize(t_bmp24 *img) {
         }
     }
 
-    // Step 2 : compute the histogram and CDF on Y (integer 0–255)
+    // 2 : compute the histogram and CDF on Y
     unsigned int hist[256] = {0};
     for (int i = 0; i < size; i++) {
         int y_val = (int)fminf(fmaxf(roundf(Y[i]), 0), 255);
@@ -410,7 +408,7 @@ void bmp24_equalize(t_bmp24 *img) {
         map[i] = (uint8_t)roundf(((float)(cdf[i] - cdf[0]) / (size - cdf[0])) * 255.0f);
     }
 
-    // Step 3 : rebuild RGB from YUV
+    // 3 : rebuild RGB from YUV
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             int i = y * width + x;
