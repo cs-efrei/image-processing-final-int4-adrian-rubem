@@ -1,13 +1,13 @@
 # P1 - TI202: Image Processing in C
 
-## 📌 Description
+## Description
 
 This project consists of creating a BMP image processing program in C. It is divided into three main parts:
 - 8-bit grayscale image processing
 - 24-bit color image processing
 - Histogram equalization to improve contrast
 
-## 👥 Project Team
+##  Project Team
 
 - Lastname Firstname (student 1)
 - Lastname Firstname (student 2)
@@ -20,7 +20,7 @@ This project consists of creating a BMP image processing program in C. It is div
 - `main.c` — Command-line interface for the program
 - `CMakeLists.txt` — CMake configuration file (optional)
 
-## 🧱 Data Structures
+##  Data Structures
 
 - `t_bmp8`: represents a grayscale image (8-bit), with header, color table, and pixel data
 - `t_bmp24`: represents a 24-bit color image, with header, pixel matrix, and image metadata
@@ -43,17 +43,17 @@ This project consists of creating a BMP image processing program in C. It is div
 - Compute cumulative normalized histogram (CDF)
 - Equalize the image to enhance contrast
 
-## 🚧 Not Implemented Features
+##  Not Implemented Features
 
 - Histogram equalization for color images (YUV conversion)
 
-## 🐞 Known Issues
+##  Known Issues
 
 - Some color images may not display correctly if not aligned properly (padding issue)
 - No graphical interface (only CLI)
 
 
-## ⚙️ Compilation and Execution
+## Compilation and Execution
 
 ### Compile using gcc:
 ```bash
@@ -79,6 +79,6 @@ make
 
 ## 📋 Task Distribution
 
-- **Student 1**: File reading/writing, grayscale filters
-- **Student 2**: Color filters, user interface, histogram equalization
-- **(Student 3)**: RGB ↔ YUV conversion and color equalization (if implemented)
+- **Adrian**: File reading/writing, grayscale filters
+- **Saïf**: Color filters, user interface, histogram equalization
+
