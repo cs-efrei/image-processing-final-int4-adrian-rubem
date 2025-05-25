@@ -2,7 +2,7 @@
 #define BMP24_H
 #include <stdint.h>
 
-// === The structure of the image BMP 24 bits ===
+// Image BMP 24 bits ===
 typedef struct {
     uint8_t red;
     uint8_t green;
