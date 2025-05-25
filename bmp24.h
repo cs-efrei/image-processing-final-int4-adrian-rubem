@@ -21,11 +21,11 @@ t_pixel **bmp24_allocateDataPixels(int width, int height);
 void bmp24_freeDataPixels(t_pixel **pixels, int height);
 void bmp24_free(t_bmp24 *img);
 
-// Load / Save
+// Save
 t_bmp24 *bmp24_loadImage(const char *filename);
 void bmp24_saveImage(t_bmp24 *img, const char *filename);
 
-// Simples filters
+// Filters
 void bmp24_negative(t_bmp24 *img);
 void bmp24_grayscale(t_bmp24 *img);
 void bmp24_brightness(t_bmp24 *img, int value);
@@ -38,7 +38,7 @@ void bmp24_outline(t_bmp24 *img);
 void bmp24_emboss(t_bmp24 *img);
 void bmp24_sharpen(t_bmp24 *img);
 
-// Part3
+// P3
 unsigned int *bmp24_computeHistogramR(const t_bmp24 *img);
 unsigned int *bmp24_computeHistogramG(const t_bmp24 *img);
 unsigned int *bmp24_computeHistogramB(const t_bmp24 *img);
