@@ -9,9 +9,9 @@ This project consists of creating a BMP image processing program in C. It is div
 
 ##  Project Team
 
-- Lastname Firstname (student 1)
-- Lastname Firstname (student 2)
-- (Optional: Lastname Firstname, student 3)
+- Saif Eddine Bousaada
+- Adrian Rubem
+
 
 ## 📂 Source Files
 
